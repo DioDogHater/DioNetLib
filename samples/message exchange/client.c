@@ -9,15 +9,17 @@
 
 #include "dionetlib.h"
 
+#define PORT "8080"
+#define ADDRESS "127.0.0.1"
+
 int main(int argc, char* argv[]) {
 	// Initialise WinSock2 if on windows
 	s_init();
 	
 	// Create the client socket with the address set to 127.0.0.1 (localhost) and port set to 8080
-	create_client_socket("127.0.0.1","8080");
+	create_client_socket(ADDRESS,PORT);
 	
 	// Try to connect to the server
-	bool s_success=false;
 	connect_client_socket;
 	if(s_success) printf("successfully connected to server!\n");
 	else { printf("failed to connect!\n"); closesocket(client_socket); s_quit(); }
@@ -35,7 +37,6 @@ int main(int argc, char* argv[]) {
 	
 	// Receive the response from the server
 	bzero(buffer,sizeof(buffer));
-	int s_recv_result;
 	s_recv(client_socket,buffer,sizeof(buffer)-1);
 	if(s_recv_result > 0) printf("received message \"%s\"\n",buffer);
 	else { printf("connection error!\n"); closesocket(client_socket); s_quit(); }
