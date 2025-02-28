@@ -1,11 +1,21 @@
+// samples/multiclient/server.c
+
+/*
+	This sample shows how we can use dionetlib to make a multi-client server without using threads.
+	It uses the select() function and fd_set structures as is, because they are the same in both Windows and Linux.
+	If you want to test the server more accurately, please use the telnet command instead of client.c, since it can only send one message, then listen.
+*/
+
 #include "dionetlib.h"
 
-#define MAX_CLIENTS
+#define MAX_CLIENTS 10
+
+#define PORT "8787"
 
 int main(int argc, char* argv[]){
 	s_init();
 	
-	create_server_socket("8787");
+	create_server_socket(PORT);
 	bind_server_socket;
 	listen_server_socket;
 	
@@ -26,10 +36,11 @@ int main(int argc, char* argv[]){
 		FD_ZERO(&readfds);
 		FD_SET(listen_socket,&readfds);
 		for(int i=0; i<MAX_CLIENTS; i++){
-			if(clients[i] > s_socket_default)
+			if(s_isvalid(clients[i])){
 				FD_SET(clients[i],&readfds);
-			if(clients[i] > maxfd)
-				maxfd=clients[i];
+				if(clients[i] > maxfd)
+					maxfd=clients[i];
+			}
 		}
 		
 		// check for activity in all sockets, if error, handle it
@@ -41,23 +52,50 @@ int main(int argc, char* argv[]){
 			// accept the client
 			s_socket new_socket=s_socket_default;
 			accept_server_socket(new_socket);
-			if(!s_success) { perror("failed to accept client!\n"); s_quit(); }
+			if(!s_success) { fprintf(stderr,"failed to accept client!\n"); s_quit(); }
 			printf("new client connected!\n");
 			
 			// greet the client
-			char greet_msg[]="Connected to server! :)";
+			char greet_msg[]="connected to server! :)";
 			s_send(new_socket,greet_msg,sizeof(greet_msg));
-			if(!s_success) { perror("failed to send greet msg!\n"); }
-			printf("Greeting sent!\n");
+			if(!s_success) { fprintf(stderr,"failed to send greet msg!\n"); }
+			printf("sreeting sent!\n");
 			
 			// find empty space to put the new client in
 			for(int i=0; i<MAX_CLIENTS; i++){
 				if(clients[i] == s_socket_default){
 					clients[i]=new_socket;
-					printf("Set new client to id: %d\n",i);
+					printf("set new client to id: %d\n",i);
+					break;
 				}
 			}
 		}
+		// check if we get a message from clients
+		for(int i=0; i<MAX_CLIENTS; i++){
+			if(FD_ISSET(clients[i],&readfds)){
+				bzero(buffer,sizeof(buffer));
+				s_recv(clients[i],buffer,sizeof(buffer)-1);
+				if(s_recv_result <= 0){
+					printf("client #%d disconnected!\n",i);
+					closesocket(clients[i]);
+					clients[i]=s_socket_default;
+				}else{
+					buffer[s_recv_result] = '\0';
+					printf("client #%d: %s\n",i,buffer);
+					// send message to all other clients
+					for(int y=0; y<MAX_CLIENTS; y++){
+						if(y == i) continue;
+						if(s_isvalid(clients[y])) { s_send(clients[y],buffer,strlen(buffer)); }
+					}
+				}
+			}
+		}
+	}
+	
+	closesocket(listen_socket);
+	for(int i=0; i<MAX_CLIENTS; i++){
+		if(clients[i] > s_socket_default)
+			closesocket(clients[i]);
 	}
 	
 	s_quit();

@@ -31,6 +31,9 @@
 - s_EWOULDBLOCK
 	macro that will give you the EWOULDBLOCK error number, OS-dependant (WSAEWOULDBLOCK on winsock2 instead of the default EWOULDBLOCK)
 
+- s_EINTR
+	macro that will give you the EINTR error number, OS-dependant (WSAEINTR on winsock2 instead of the default EINTR)
+
 - s_socket_block_mode / s_socket_block_flags
 	unsigned long / int variable that will be used in set_socket_block(s_sock,s_block_state)
 
@@ -100,6 +103,14 @@
 	VERY IMPORTANT: you will need the client socket for later functions for data transfer !!!
 	THE NAME OF THE s_socket VARIABLE HOLDING THE CLIENT SOCKET IS client_socket
 
+# --------- OTHER FEATURES YOU CAN USE ------------
+
+- fd_set, FD_SET(), FD_ISSET(), FD_CLR(), FD_ZERO(), select()
+	thankfully, these functions are very similar (almost identical) in both operating system, so use them to your liking
+	just be sure to use the implemented s_errno instead of actual errno or WSAGetLastError() to check the possible errors!
+	also use the s_socket type instead of int's for sockets and nfds argument for select()
+	NOTE: Beware of select(), because sadly it can only support sockets fds having a value less than 1024!
+
 */
 
 // ---------------------------- WINDOWS ------------------------------------
@@ -132,12 +143,14 @@
 #define s_socket_default INVALID_SOCKET
 #define s_errno WSAGetLastError()
 #define s_EWOULDBLOCK WSAEWOULDBLOCK
+#define s_EINTR WSAEINTR
 
 unsigned long s_socket_block_mode;
 bool s_success;
 int s_recv_result;
 int s_iresult;
 
+#define s_isvalid(s_sock) (int)(s_sock) > 0
 #define bzero(b,sz) memset((b),0,(sz))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_mode=s_block_state?0:1;\
@@ -195,7 +208,7 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 	if(connect(client_socket,s_ptr->ai_addr,(int)s_ptr->ai_addrlen) == SOCKET_ERROR) { closesocket(client_socket); client_socket=s_socket_default; s_success=false; }\
 	else s_success=true;
 #define close_client_socket \
-	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n"); closesocket(client_socket); s_quit(); }\
+	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n",WSAGetLastError()); closesocket(client_socket); s_quit(); }\
 	closesocket(client_socket);
 // ---------------------------------------------------------------------------
 
@@ -215,11 +228,13 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 #define s_socket_default 0
 #define s_errno errno
 #define s_EWOULDBLOCK EWOULDBLOCK
+#define s_EINTR EINTR
 
 int s_socket_block_flags;
 bool s_success;
 int s_recv_result;
 
+#define s_isvalid(s_sock) (int)(s_sock) > 0
 #define closesocket(s) close((s))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_flags=fcntl(s_sock, F_GETFL, 0);\

@@ -150,6 +150,7 @@ bool s_success;
 int s_recv_result;
 int s_iresult;
 
+#define s_isvalid(s_sock) (int)(s_sock) > 0
 #define bzero(b,sz) memset((b),0,(sz))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_mode=s_block_state?0:1;\
@@ -207,7 +208,7 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 	if(connect(client_socket,s_ptr->ai_addr,(int)s_ptr->ai_addrlen) == SOCKET_ERROR) { closesocket(client_socket); client_socket=s_socket_default; s_success=false; }\
 	else s_success=true;
 #define close_client_socket \
-	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n"); closesocket(client_socket); s_quit(); }\
+	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n",WSAGetLastError()); closesocket(client_socket); s_quit(); }\
 	closesocket(client_socket);
 // ---------------------------------------------------------------------------
 
@@ -233,6 +234,7 @@ int s_socket_block_flags;
 bool s_success;
 int s_recv_result;
 
+#define s_isvalid(s_sock) (int)(s_sock) > 0
 #define closesocket(s) close((s))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_flags=fcntl(s_sock, F_GETFL, 0);\
