@@ -62,6 +62,10 @@
 	closes the socket connection and frees the port connection for other programs (very important in linux)
 	note: with WinSock2, this is not actually a macro in this header, but the actual function used by WinSock2
 
+- s_isvalid(s_sock)
+	equivalent of (int)s_sock > 0
+	used to check if a socket is valid, useful in an array of sockets for example
+
 - set_socket_block(s_sock,s_block_state)
 	sets the socket to either (s_block_state=true) blocking mode or (s_block_state=false) non-blocking mode
 
