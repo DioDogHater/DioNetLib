@@ -227,6 +227,7 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 #include <netinet/in.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #define s_socket int
 #define s_socket_default 0

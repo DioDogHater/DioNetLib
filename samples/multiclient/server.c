@@ -45,7 +45,7 @@ int main(int argc, char* argv[]){
 		
 		// check for activity in all sockets, if error, handle it
 		int activity=select(maxfd+1,&readfds,NULL,NULL,NULL);
-		if((activity < 0) && (s_errno != s_EINTR)) printf("select error!\n");
+		if((activity < 0) && (s_errno != s_EINTR)) perror("select error!\n");
 		
 		// check if new incoming client
 		if(FD_ISSET(listen_socket, &readfds)){
