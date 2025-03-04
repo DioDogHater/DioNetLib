@@ -8,7 +8,7 @@
 
 #include "dionetlib.h"
 
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 20
 
 #define PORT "8787"
 
@@ -52,21 +52,22 @@ int main(int argc, char* argv[]){
 			// accept the client
 			s_socket new_socket=s_socket_default;
 			accept_server_socket(new_socket);
-			if(!s_success) { fprintf(stderr,"failed to accept client!\n"); s_quit(); }
-			printf("new client connected!\n");
-			
-			// greet the client
-			char greet_msg[]="connected to server! :)";
-			s_send(new_socket,greet_msg,sizeof(greet_msg));
-			if(!s_success) { fprintf(stderr,"failed to send greet msg!\n"); }
-			printf("sreeting sent!\n");
-			
-			// find empty space to put the new client in
-			for(int i=0; i<MAX_CLIENTS; i++){
-				if(clients[i] == s_socket_default){
-					clients[i]=new_socket;
-					printf("set new client to id: %d\n",i);
-					break;
+			if(!s_success) fprintf(stderr,"failed to accept client!\n");
+			else{
+				printf("new client connected!\n");
+				// greet the client
+				char greet_msg[]="connected to server! :)";
+				s_send(new_socket,greet_msg,sizeof(greet_msg));
+				if(!s_success) { fprintf(stderr,"failed to send greet msg!\n"); }
+				printf("greeting sent!\n");
+				
+				// find empty space to put the new client in
+				for(int i=0; i<MAX_CLIENTS; i++){
+					if(clients[i] == s_socket_default){
+						clients[i]=new_socket;
+						printf("set new client to id: %d\n",i);
+						break;
+					}
 				}
 			}
 		}
@@ -94,7 +95,7 @@ int main(int argc, char* argv[]){
 	
 	closesocket(listen_socket);
 	for(int i=0; i<MAX_CLIENTS; i++){
-		if(clients[i] > s_socket_default)
+		if(s_isvalid(clients[i]))
 			closesocket(clients[i]);
 	}
 	

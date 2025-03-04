@@ -40,6 +40,9 @@
 - s_success
 	bool variable that holds wether the last macro has been successfully executed or not (vital for sending, connecting, accepting, etc.)
 
+- s_active
+	bool variable that holds wether library is initialized or got stopped by s_stop() or s_quit() (if you set it to not exit)
+
 - s_recv_result
 	int variable that holds the result returned from the last s_read(s_sock,s_data,s_sz) called
 	normally holds the amount of bytes of data stored in the buffer, but will be 0 if connection lost and -1 if an error occurs
@@ -78,9 +81,15 @@
 	will send s_data through s_sock's connection with size s_sz
 	please check if s_success is false in case of an error!
 
+- s_send_silent(s_sock,s_data,s_sz)
+	s_send but without printing error messages
+
 - s_recv(s_sock,s_data,s_sz)
 	will receive s_sz bytes of data from s_sz's connection and store it in s_data
 	note: normally, if s_recv_result is 0 or <0, there has been a connection error, so please check before reading s_data
+
+- s_recv_silent(s_sock,s_data,s_sz)
+	s_recv but without printing error messages
 
 - create_server_socket(s_port)
 	creates the server's listen socket, as the variable listen_socket (if you need to use it)
@@ -147,27 +156,33 @@
 #define s_socket_default INVALID_SOCKET
 #define s_errno WSAGetLastError()
 #define s_EWOULDBLOCK WSAEWOULDBLOCK
+#define s_EAGAIN EAGAIN
 #define s_EINTR WSAEINTR
 
 unsigned long s_socket_block_mode;
 bool s_success;
+bool s_active;
 int s_recv_result;
 int s_iresult;
 
-#define s_isvalid(s_sock) (int)(s_sock) > 0
+#define s_isvalid(s_sock) ((int)(s_sock) > 0)
 #define bzero(b,sz) memset((b),0,(sz))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_mode=s_block_state?0:1;\
 	s_success=(ioctlsocket(s_sock,FIONBIO,&s_socket_block_mode) == 0);
-void s_init() { WSADATA WsaData; int result; if((result=WSAStartup(MAKEWORD(2,2),&WsaData)) != 0) { fprintf(stderr,"WinSock2 init error: %d\n",result); } }
-void s_stop() { WSACleanup(); }
-void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not exit
+void s_init() { WSADATA WsaData; int result; if((result=WSAStartup(MAKEWORD(2,2),&WsaData)) != 0) { fprintf(stderr,"WinSock2 init error: %d\n",result); } else s_active=true; }
+void s_stop() { s_active=false; WSACleanup(); }
+void s_quit() { s_active=false; WSACleanup(); exit(0); } // Change this if you want it to not exit
 #define s_send(s_sock, s_data, s_sz) \
 	if(send(s_sock,s_data,(int)s_sz,0) == SOCKET_ERROR) { fprintf(stderr,"send() error: %d\n",WSAGetLastError()); s_success=false; }\
 	else s_success=true;
+#define s_send_silent(s_sock, s_data, s_sz) \
+	s_success=(send(s_sock,s_data,(int)s_sz,0) != SOCKET_ERROR);
 #define s_recv(s_sock, s_data, s_sz) \
 	s_recv_result=recv(s_sock,s_data,(int)s_sz,0);\
 	if(s_recv_result < 0) fprintf(stderr,"recv() error: %d\n",WSAGetLastError());
+#define s_recv_silent(s_sock, s_data, s_sz) \
+	s_recv_result=recv(s_sock,s_data,(int)s_sz,0);
 #define create_server_socket(s_port) \
 	struct addrinfo *s_result_ptr=NULL, s_hints;\
 	s_socket listen_socket=s_socket_default;\
@@ -194,7 +209,7 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 	if(s_client_socket == s_socket_default) { fprintf(stderr,"accept() error: %d\n",WSAGetLastError()); s_success=false; }\
 	else s_success=true;
 #define close_server_socket(s_client_socket) \
-	if(shutdown(s_client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n"); closesocket(s_client_socket); s_quit(); }\
+	if(shutdown(s_client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n"); closesocket(s_client_socket); s_stop(); }\
 	closesocket(s_client_socket);
 #define create_client_socket(s_addr, s_port) \
 	struct addrinfo *s_result_ptr=NULL, *s_ptr=NULL, s_hints;\
@@ -203,16 +218,16 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 	s_hints.ai_family=AF_UNSPEC;\
 	s_hints.ai_socktype=SOCK_STREAM;\
 	s_hints.ai_protocol=IPPROTO_TCP;\
-	if((s_iresult=getaddrinfo(s_addr, s_port, &s_hints, &s_result_ptr))!= 0){ fprintf(stderr,"getaddrinfo() error: %d\n",s_iresult); s_quit(); }\
+	if((s_iresult=getaddrinfo(s_addr, s_port, &s_hints, &s_result_ptr))!= 0){ fprintf(stderr,"getaddrinfo() error: %d\n",s_iresult); s_stop(); }\
 	s_ptr=s_result_ptr;\
 	client_socket=s_socket_default;\
 	client_socket=socket(s_ptr->ai_family, s_ptr->ai_socktype, s_ptr->ai_protocol);\
-	if(client_socket == s_socket_default){ fprintf(stderr,"socket() error: %d\n",WSAGetLastError()); freeaddrinfo(s_result_ptr); s_quit(); }
+	if(client_socket == s_socket_default){ fprintf(stderr,"socket() error: %d\n",WSAGetLastError()); freeaddrinfo(s_result_ptr); s_stop(); }
 #define connect_client_socket \
 	if(connect(client_socket,s_ptr->ai_addr,(int)s_ptr->ai_addrlen) == SOCKET_ERROR) { closesocket(client_socket); client_socket=s_socket_default; s_success=false; }\
 	else s_success=true;
 #define close_client_socket \
-	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n",WSAGetLastError()); closesocket(client_socket); s_quit(); }\
+	if(shutdown(client_socket,SD_SEND) == SOCKET_ERROR) { fprintf(stderr,"shutdown() error: %d\n",WSAGetLastError()); closesocket(client_socket); s_stop(); }\
 	closesocket(client_socket);
 // ---------------------------------------------------------------------------
 
@@ -233,10 +248,12 @@ void s_quit() { WSACleanup(); exit(0); } // Change this if you want it to not ex
 #define s_socket_default 0
 #define s_errno errno
 #define s_EWOULDBLOCK EWOULDBLOCK
+#define s_EAGAIN EAGAIN
 #define s_EINTR EINTR
 
 int s_socket_block_flags;
 bool s_success;
+bool s_active;
 int s_recv_result;
 
 #define s_isvalid(s_sock) (int)(s_sock) > 0
@@ -246,15 +263,19 @@ int s_recv_result;
 	if(s_socket_block_flags == -1)s_success=false;\
 	s_socket_block_flags = s_block_state ? (s_socket_block_flags & ~O_NONBLOCK) : (s_socket_block_flags | O_NONBLOCK);\
 	s_success=(fcntl(s_sock, F_SETFL, s_socket_block_flags) == 0);
-void s_init() {} // They both do absolutely nothing. Blame windows and their weird ahh system ok.
-void s_stop() {}
-void s_quit() { exit(0); }
-#define s_send(s_socket, s_data, s_sz) \
-	if(write(s_socket,s_data,s_sz) < 0) { perror("write() (s_send()) error!\n"); s_success=false; }\
+void s_init() { s_active=true; } // They both do absolutely nothing. Blame windows and their weird ahh system ok.
+void s_stop() { s_active=false; }
+void s_quit() { s_active=false; exit(0); }
+#define s_send(s_sock, s_data, s_sz) \
+	if(write(s_sock,s_data,s_sz) < 0) { perror("write() (s_send()) error!\n"); s_success=false; }\
 	else s_success=true;
-#define s_recv(s_socket, s_data, s_sz) \
-	s_recv_result=read(s_socket,s_data,s_sz);\
+#define s_send_silent(s_sock, s_data, s_sz) \
+	s_success=(write(s_sock,s_data,s_sz) >= 0);
+#define s_recv(s_sock, s_data, s_sz) \
+	s_recv_result=read(s_sock,s_data,s_sz);\
 	if(s_recv_result < 0) perror("read() (s_recv()) error!\n");
+#define s_recv_silent(s_sock, s_data, s_sz) \
+	s_recv_result=read(s_sock,s_data,s_sz);
 #define create_server_socket(s_port) \
 	struct sockaddr_in s_serv_addr;\
 	s_socket listen_socket=socket(AF_INET,SOCK_STREAM,0);\
@@ -274,15 +295,15 @@ void s_quit() { exit(0); }
 	if(s_client_socket < 0) { perror("accept() error!\n"); s_success=false; }\
 	else s_success=true;
 #define close_server_socket(s_client_socket) \
-	if(shutdown(s_client_socket,SHUT_WR) < 0) { perror("shutdown() error!\n"); closesocket(s_client_socket); s_quit(); }\
+	if(shutdown(s_client_socket,SHUT_WR) < 0) { perror("shutdown() error!\n"); closesocket(s_client_socket); s_stop(); }\
 	closesocket(s_client_socket);
 #define create_client_socket(s_address, s_port) \
 	struct hostent* s_server;\
 	struct sockaddr_in s_serv_addr;\
 	s_socket client_socket=socket(AF_INET,SOCK_STREAM,0);\
-	if(client_socket < 0) { perror("socket() error!\n"); s_quit(); }\
+	if(client_socket < 0) { perror("socket() error!\n"); s_stop(); }\
 	s_server=gethostbyname(s_address);\
-	if(s_server == NULL) { perror("gethostbyname() error! Invalid address!\n"); closesocket(client_socket); s_quit(); }\
+	if(s_server == NULL) { perror("gethostbyname() error! Invalid address!\n"); closesocket(client_socket); s_stop(); }\
 	bzero((char*)&s_serv_addr,sizeof(s_serv_addr));\
 	s_serv_addr.sin_family=AF_INET;\
 	bcopy((char*) s_server->h_addr, (char*) &s_serv_addr.sin_addr.s_addr, s_server->h_length);\
@@ -291,7 +312,7 @@ void s_quit() { exit(0); }
 	if(connect(client_socket,(struct sockaddr*)&s_serv_addr,sizeof(s_serv_addr)) < 0) { perror("connect() error!\n"); s_success=false; }\
 	else s_success=true;
 #define close_client_socket \
-	if(shutdown(client_socket,SHUT_WR) < 0) { perror("shutdown() error!\n"); closesocket(client_socket); s_quit(); }\
+	if(shutdown(client_socket,SHUT_WR) < 0) { perror("shutdown() error!\n"); closesocket(client_socket); s_stop(); }\
 	closesocket(client_socket);
 
 // ---------------------------------------------------------------------------
