@@ -256,7 +256,7 @@ bool s_success;
 bool s_active;
 int s_recv_result;
 
-#define s_isvalid(s_sock) (int)(s_sock) > 0
+#define s_isvalid(s_sock) ((int)(s_sock) > 0)
 #define closesocket(s) close((s))
 #define set_socket_block(s_sock, s_block_state) \
 	s_socket_block_flags=fcntl(s_sock, F_GETFL, 0);\
