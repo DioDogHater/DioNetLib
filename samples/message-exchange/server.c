@@ -7,7 +7,7 @@
 	Please read the documentation in dionetlib.h before using/compiling a program with the library.
 */
 
-#include "dionetlib.h"
+#include "../../dionetlib.h"
 
 #define PORT "8080"
 

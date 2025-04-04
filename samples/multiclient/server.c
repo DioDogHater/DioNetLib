@@ -6,7 +6,7 @@
 	If you want to test the server more accurately, please use the telnet command instead of client.c, since it can only send one message, then listen.
 */
 
-#include "dionetlib.h"
+#include "../../dionetlib.h"
 
 #define MAX_CLIENTS 20
 

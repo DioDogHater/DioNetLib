@@ -5,7 +5,7 @@
 	Please use telnet instead of this, for it is only capable of sending a message once, then listening.
 */
 
-#include "dionetlib.h"
+#include "../../dionetlib.h"
 
 #define ADDRESS "127.0.0.1"
 #define PORT "8787"
